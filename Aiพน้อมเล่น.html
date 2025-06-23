@@ -49,7 +49,6 @@ let classes = c;
   })) {
     classes += " move-highlight";
   }
-
   if (p>0) counts[p]++;
   html += `<td class="${classes}" onclick="cellClick(${x},${y})">${icon}</td>`;
 }
@@ -59,7 +58,7 @@ html += "</tr>";
 
 function resetBoard(){ board = Array(8).fill().map(() => Array(8).fill(0)); for (let y=0; y<=1; y++) for (let x=0; x<8; x++) if ((x+y)%2===1) board[y][x]=2; for (let y=6; y<=7; y++) for (let x=0; x<8; x++) if ((x+y)%2===1) board[y][x]=1; selectedPiece = null; possibleMoves = []; renderBoard(); document.getElementById("result").innerText = "เริ่มเกม! คุณเป็นสีขาว ⚪ เดินก่อน"; }
 
-function getMultiJumpPaths(b,x,y,p,path=[[x,y]]){ let out = []; let dirs = (p==1)?[[-1,-1],[1,-1]] : (p==2)?[[-1,1],[1,1]] : [[1,1],[1,-1],[-1,1],[-1,-1]]; for (let [dx,dy] of dirs){ let cx = x + dx, cy = y + dy; let hasEnemy = false; while (cx >= 0 && cx < 8 && cy >= 0 && cy < 8) { let t = b[cy][cx]; if (t === 0 && !hasEnemy) { } else if (t !== 0 && !hasEnemy && ((p==1||p==3)&&(t==2||t==4) || (p==2||p==4)&&(t==1||t==3))) { hasEnemy = true; } else if (t === 0 && hasEnemy) { let newPath = [...path, [cx, cy]]; let newBoard = simulateMove(newPath, b); let next = getMultiJumpPaths(newBoard, cx, cy, p, newPath); if (next.length) out.push(...next); else out.push(newPath); break; } else { break; } cx += dx; cy += dy; } } return out; }
+function getMultiJumpPaths(b,x,y,p,path=[[x,y]]){ let out = []; let dirs = (p==1)?[[-1,-1],[1,-1]] : (p==2)?[[-1,1],[1,1]] : [[1,1],[1,-1],[-1,1],[-1,-1]]; for (let [dx,dy] of dirs){ let cx = x + dx, cy = y + dy; while (cx+dx>=0 && cx+dx<8 && cy+dy>=0 && cy+dy<8) { let t = b[cy][cx]; if (t != 0 && ((p==1||p==3)&&(t==2||t==4) || (p==2||p==4)&&(t==1||t==3))) { let nx = cx + dx, ny = cy + dy; if (b[ny][nx] === 0) { let newPath = [...path, [nx, ny]]; let newBoard = simulateMove(newPath, b); let next = getMultiJumpPaths(newBoard, nx, ny, p, newPath); if (next.length) out.push(...next); else out.push(newPath); } break; } if (t !== 0) break; if (p < 3) break; cx += dx; cy += dy; } } return out; }
 
 function getMoves(b,player){ let jumps=[], normal=[]; for (let y=0;y<8;y++){ for (let x=0;x<8;x++){ let p = b[y][x]; if ((player==1&&(p==1||p==3))||(player==2&&(p==2||p==4))){ let jps = getMultiJumpPaths(b,x,y,p); if (jps.length) jumps.push(...jps); else { let dirs = [[1,1],[1,-1],[-1,1],[-1,-1]]; for (let [dx,dy] of dirs){ let nx=x+dx, ny=y+dy; if (nx>=0&&nx<8&&ny>=0&&ny<8&&b[ny][nx]==0){ if ((p==1 && dy==-1) || (p==2 && dy==1) || (p>=3)) { normal.push([[x,y],[nx,ny]]); } } } } } } } return jumps.length?jumps:normal; }
 
@@ -69,7 +68,7 @@ function evaluate(b){ let score = 0; for (let y=0; y<8; y++){ for (let x=0; x<8;
 
 function minimax(b,d,max,alpha=-9999,beta=9999){ if (d==0) return [evaluate(b),null]; let moves = getMoves(b,max?1:2); if (!moves.length) return [evaluate(b),null]; let best=max?-9999:9999, bestMove=null; for (let m of moves){ let next = simulateMove(m,b); let [val] = minimax(next,d-1,!max,alpha,beta); if (max && val>best){ best=val; bestMove=m; alpha=Math.max(alpha,val); } if (!max && val<best){ best=val; bestMove=m; beta=Math.min(beta,val); } if (beta<=alpha) break; } return [best,bestMove]; }
 
-function aiAutoMove(){ let [score, move] = minimax(board, 20, true); if (!move) { document.getElementById("result").innerText = "❌ AI เดินไม่ได้ คุณชนะ!"; return; } board = simulateMove(move); renderBoard(); document.getElementById("result").innerText = 🤖 AI เดิน: ${move.map(([x,y]) => (${x},${y})).join(" → ")}; selectedPiece = null; possibleMoves = []; }
+function aiAutoMove(){ let [score, move] = minimax(board, 50, true); if (!move) { document.getElementById("result").innerText = "❌ AI เดินไม่ได้ คุณชนะ!"; return; } board = simulateMove(move); renderBoard(); document.getElementById("result").innerText = 🤖 AI เดิน: ${move.map(([x,y]) => (${x},${y})).join(" → ")}; selectedPiece = null; possibleMoves = []; }
 
 function cellClick(x,y){ let p = board[y][x]; if (possibleMoves.length > 0 && possibleMoves.some(m => m[m.length-1][0] === x && m[m.length-1][1] === y)) { let move = possibleMoves.find(m => m[m.length-1][0] === x && m[m.length-1][1] === y); board = simulateMove(move); renderBoard(); document.getElementById("result").innerText = คุณเดิน: ${move.map(([x,y]) => (${x},${y})).join(" → ")}; selectedPiece = null; possibleMoves = []; setTimeout(() => aiAutoMove(), 200); return; } if (p === 2 || p === 4) { selectedPiece = [x,y]; possibleMoves = getMultiJumpPaths(board,x,y,p); if (possibleMoves.length === 0) { let normalMoves = [], dirs = [[1,1],[1,-1],[-1,1],[-1,-1]]; for (let [dx,dy] of dirs) { let nx = x + dx, ny = y + dy; if (nx>=0 && nx<8 && ny>=0 && ny<8 && board[ny][nx] === 0) { if ((p === 2 && dy === 1) || p >= 3) { normalMoves.push([[x,y],[nx,ny]]); } } } possibleMoves = normalMoves; } renderBoard(); } else { selectedPiece = null; possibleMoves = []; renderBoard(); } } </script>
 
